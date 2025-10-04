@@ -1,18 +1,11 @@
 import "./App.css";
 import CardForm from "./components/CardForm";
 import CardList from "./components/CardList";
-import { useState } from "react";
-
-interface CardData {
-  id: string;
-  cardNumber: string;
-  expiryDate: string;
-  cardHolder: string;
-  cvv: string;
-}
+import { useState, useEffect } from "react";
+import { cardService, type GetCard } from "./services/card.service";
 
 function App() {
-  const [cards, setCards] = useState<CardData[]>([]);
+  const [cards, setCards] = useState<GetCard[]>([]);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [currentCard, setCurrentCard] = useState({
     cardNumber: "",
@@ -20,6 +13,26 @@ function App() {
     cardHolder: "",
     cvv: "",
   });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadCards();
+  }, []);
+
+  const loadCards = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const fetchedCards = await cardService.getAllCards();
+      setCards(fetchedCards);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load cards');
+      console.error('Error loading cards:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleFormChange = (values: {
     cardNumber: string;
@@ -30,30 +43,38 @@ function App() {
     setCurrentCard(values);
   };
 
-  const handleAddCard = (values: typeof currentCard) => {
-    if (selectedCardId) {
-      setCards(cards.map(card =>
-        card.id === selectedCardId
-          ? { ...card, ...values }
-          : card
-      ));
-      setSelectedCardId(null);
-    } else {
-      const newCard: CardData = {
-        id: Date.now().toString(),
-        ...values,
-      };
-      setCards([...cards, newCard]);
+  const handleAddCard = async (values: typeof currentCard) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      if (selectedCardId) {
+        const updatedCard = await cardService.updateCard(selectedCardId, values);
+        setCards(cards.map(card =>
+          card.id === selectedCardId ? updatedCard : card
+        ));
+        setSelectedCardId(null);
+      } else {
+        const newCard = await cardService.createCard(values);
+        setCards([...cards, newCard]);
+      }
+
+      setCurrentCard({
+        cardNumber: "",
+        expiryDate: "",
+        cardHolder: "",
+        cvv: "",
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save card');
+      console.error('Error saving card:', err);
+      throw err;
+    } finally {
+      setLoading(false);
     }
-    setCurrentCard({
-      cardNumber: "",
-      expiryDate: "",
-      cardHolder: "",
-      cvv: "",
-    });
   };
 
-  const handleCardClick = (card: CardData) => {
+  const handleCardClick = (card: GetCard) => {
     setSelectedCardId(card.id);
     setCurrentCard({
       cardNumber: card.cardNumber,
@@ -63,14 +84,30 @@ function App() {
     });
   };
 
+  const handleCancel = () => {
+    setSelectedCardId(null);
+    setCurrentCard({
+      cardNumber: "",
+      expiryDate: "",
+      cardHolder: "",
+      cvv: "",
+    });
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="w-full max-w-2xl">
+        {error && (
+          <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+            {error}
+          </div>
+        )}
+
         <div className="relative mb-[-80px] z-10 px-8">
           <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-8 text-white shadow-2xl">
             <div className="flex justify-between items-start mb-12">
               <div className="flex flex-row gap-3">
-                <div className="text-2xl font-bold py-1">monobank</div> 
+                <div className="text-2xl font-bold py-1">monobank</div>
                 <span className="text-3xl font-semibold text-gray-400">|</span>
                 <div className="text-sm text-gray-400 pt-3">Universal Bank</div>
               </div>
@@ -128,11 +165,12 @@ function App() {
           onFormChange={handleFormChange}
           onAddCard={handleAddCard}
           currentCard={currentCard}
-          onCancel={() => setSelectedCardId(null)}
+          onCancel={handleCancel}
           isEditing={selectedCardId !== null}
+          loading={loading}
         />
 
-        <CardList cards={cards} onCardClick={handleCardClick} />
+        <CardList cards={cards} onCardClick={handleCardClick} loading={loading} />
       </div>
     </div>
   );

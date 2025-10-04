@@ -14,7 +14,7 @@ interface CardFormProps {
     expiryDate: string;
     cardHolder: string;
     cvv: string;
-  }) => void;
+  }) => Promise<void>;
   currentCard: {
     cardNumber: string;
     expiryDate: string;
@@ -23,9 +23,10 @@ interface CardFormProps {
   };
   onCancel: () => void;
   isEditing: boolean;
+  loading?: boolean;
 }
 
-const CardForm = ({ onFormChange, onAddCard, currentCard, onCancel, isEditing }: CardFormProps) => {
+const CardForm = ({ onFormChange, onAddCard, currentCard, onCancel, isEditing, loading = false }: CardFormProps) => {
   const validationSchema = cardValidationSchema;
 
   const initialValues = {
@@ -35,9 +36,15 @@ const CardForm = ({ onFormChange, onAddCard, currentCard, onCancel, isEditing }:
     cvv: "",
   };
 
-  const handleSubmit = (values: typeof initialValues, { resetForm }: any) => {
-    onAddCard(values);
-    resetForm();
+  const handleSubmit = async (values: typeof initialValues, { resetForm, setSubmitting }: any) => {
+    try {
+      await onAddCard(values);
+      resetForm();
+    } catch (error) {
+      console.error('Form submission error:', error);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const formatCardNumber = (value: string) => {
@@ -193,17 +200,18 @@ const CardForm = ({ onFormChange, onAddCard, currentCard, onCancel, isEditing }:
             <div className="flex gap-3">
               <button
                 type="submit"
-                disabled={!isFormValid}
+                disabled={!isFormValid || loading}
                 className={`px-6 py-3 rounded-full font-medium transition-colors shadow-md ${
-                  isFormValid
+                  isFormValid && !loading
                     ? 'bg-indigo-600 text-white hover:bg-indigo-700 cursor-pointer'
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 }`}
               >
-                {isEditing ? 'Editar Tarjeta' : 'Agregar Tarjeta'}
+                {loading ? 'Guardando...' : (isEditing ? 'Editar Tarjeta' : 'Agregar Tarjeta')}
               </button>
               <button
                 type="button"
+                disabled={loading}
                 onClick={() => {
                   setFieldValue('cardNumber', '');
                   setFieldValue('expiryDate', '');
@@ -211,7 +219,7 @@ const CardForm = ({ onFormChange, onAddCard, currentCard, onCancel, isEditing }:
                   setFieldValue('cvv', '');
                   onCancel();
                 }}
-                className="px-6 py-3 bg-gray-200 text-gray-700 rounded-full font-medium hover:bg-gray-300 transition-colors"
+                className="px-6 py-3 bg-gray-200 text-gray-700 rounded-full font-medium hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancelar
               </button>

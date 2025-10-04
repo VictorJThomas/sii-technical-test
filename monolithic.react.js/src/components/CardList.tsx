@@ -9,9 +9,10 @@ interface CardData {
 interface CardListProps {
   cards: CardData[];
   onCardClick?: (card: CardData) => void;
+  loading?: boolean;
 }
 
-const CardList = ({ cards, onCardClick }: CardListProps) => {
+const CardList = ({ cards, onCardClick, loading = false }: CardListProps) => {
   const maskCardNumber = (num: string) => {
     const cleaned = num.replace(/\s/g, '');
     if (cleaned.length === 16) {
@@ -26,6 +27,14 @@ const CardList = ({ cards, onCardClick }: CardListProps) => {
     const chunks = cleaned.match(/.{1,4}/g);
     return chunks ? chunks.join(' ') : masked;
   };
+
+  if (loading) {
+    return (
+      <div className="mt-8 px-8">
+        <div className="text-center text-gray-500">Cargando tarjetas...</div>
+      </div>
+    );
+  }
 
   if (cards.length === 0) return null;
 
